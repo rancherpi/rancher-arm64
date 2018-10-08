@@ -1,0 +1,338 @@
+diff --git a/.dockerignore b/.dockerignore
+index 853b5381..4a82a8fd 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -14,3 +14,5 @@
+ **/*.pyc
+ **/__pycache__
+ ./management-state/
++.cache/*
++.git/*
+diff --git a/.gitignore b/.gitignore
+index 758043c5..c43d3594 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -19,3 +19,4 @@ __pycache__
+ /management-state
+ /rancher
+ *.pytest_cache
++./cache
+diff --git a/Dockerfile.dapper b/Dockerfile.dapper
+index 3e95b04d..282165b6 100644
+--- a/Dockerfile.dapper
++++ b/Dockerfile.dapper
+@@ -6,20 +6,21 @@ ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
+ 
+ RUN apt-get update && \
+     apt-get install -y gcc ca-certificates git wget curl vim less file xz-utils unzip && \
+-    curl -sLf https://github.com/rancher/machine-package/releases/download/v0.13.0-rancher2/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
++    curl -sLf curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/v2.0.8-arm64/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+     rm -f /bin/sh && ln -s /bin/bash /bin/sh
+ 
+-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
++ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
+ 
+-RUN wget -O - https://storage.googleapis.com/golang/go1.9.2.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
++RUN wget -O - https://storage.googleapis.com/golang/go1.11.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+     go get github.com/rancher/trash && go get github.com/golang/lint/golint
+ 
+-ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
+-    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
++ENV DOCKER_URL_amd64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.1-ce.tgz \
++    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.11.2-ros1/docker-1.11.2_arm.tgz \
++    DOCKER_URL_arm64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.0-ce.tgz \
+     DOCKER_URL=DOCKER_URL_${ARCH}
+ 
+-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
++RUN curl -sLf ${!DOCKER_URL} | tar xvzf - -C /usr/bin --strip-components=1 docker/docker && chmod +x /usr/bin/docker
+ 
+ RUN apt-get update && \
+     apt-get install -y tox
+diff --git a/Makefile b/Makefile
+index d7d72a16..83be0205 100644
+--- a/Makefile
++++ b/Makefile
+@@ -8,7 +8,7 @@ TARGETS := $(shell ls scripts)
+ 	@mv .dapper.tmp .dapper
+ 
+ $(TARGETS): .dapper
+-	./.dapper $@
++	./.dapper -m bind $@
+ 
+ trash: .dapper
+ 	./.dapper -m bind trash
+diff --git a/package/Dockerfile b/package/Dockerfile
+index ba889ff4..86ea7a05 100644
+--- a/package/Dockerfile
++++ b/package/Dockerfile
+@@ -9,17 +9,17 @@ RUN mkdir /root/.kube && \
+     ln -s /usr/bin/rancher /usr/bin/reset-password
+ WORKDIR /var/lib/rancher
+ 
+-ENV CATTLE_HELM_VERSION v2.9.1-rancher1
+-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher1-1
++ENV CATTLE_HELM_VERSION v2.0.8-arm64
++ENV CATTLE_MACHINE_VERSION v2.0.8-arm64
+ ENV LOGLEVEL_VERSION v0.1
+ ENV TINI_VERSION v0.18.0
+-ENV TELEMETRY_VERSION v0.5.1
++ENV TELEMETRY_VERSION v2.0.8-arm64
+ 
+-RUN curl -sLf https://github.com/rancher/machine-package/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
+-    curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
+-    curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini > /usr/bin/tini && \
+-    curl -sLf https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
+-    curl -sLf https://github.com/rancher/telemetry/releases/download/${TELEMETRY_VERSION}/telemetry > /usr/bin/telemetry && \
++RUN curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/${CATTLE_MACHINE_VERSION}/docker-machine.tar.gz | tar xvzf - -C /usr/bin && \
++    curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/v2.0.8-arm64/loglevel-arm64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin && \
++    curl -sLf https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 > /usr/bin/tini && \
++    curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/${CATTLE_HELM_VERSION}/helm > /usr/bin/helm && \
++    curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/${TELEMETRY_VERSION}/telemetry > /usr/bin/telemetry && \
+     chmod +x /usr/bin/helm /usr/bin/tini /usr/bin/telemetry
+ 
+ ENV CATTLE_UI_PATH /usr/share/rancher/ui
+@@ -43,12 +43,14 @@ ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli/${CATTLE_CLI_VERSION
+ ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
+ 
+ ARG VERSION=dev
++ARG REPO=rancher
+ ENV CATTLE_SERVER_VERSION ${VERSION}
+ COPY entrypoint.sh rancher /usr/bin/
+ RUN chmod +x /usr/bin/entrypoint.sh
+ 
+-ENV CATTLE_AGENT_IMAGE rancher/rancher-agent:${VERSION}
+-ENV CATTLE_SERVER_IMAGE rancher/rancher
++ENV CATTLE_AGENT_IMAGE ${REPO}/rancher-agent:${VERSION}
++ENV CATTLE_SERVER_IMAGE ${REPO}/rancher
+ VOLUME /var/lib/rancher
+ 
+ ENTRYPOINT ["entrypoint.sh"]
++ENV ETCD_UNSUPPORTED_ARCH arm64
+diff --git a/package/Dockerfile.agent b/package/Dockerfile.agent
+index 971442d5..3348fab7 100644
+--- a/package/Dockerfile.agent
++++ b/package/Dockerfile.agent
+@@ -1,20 +1,21 @@
+ FROM ubuntu:18.04
+ RUN apt-get update && \
+     apt-get install -y --no-install-recommends curl ca-certificates jq iproute2 vim-tiny less bash-completion unzip && \
+-    curl -sLf https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 > /usr/bin/docker && \
++    curl -sLf https://download.docker.com/linux/static/stable/aarch64/docker-17.09.0-ce.tgz | tar xvzf - -C /usr/bin --strip-components=1 docker/docker && \
+     chmod +x /usr/bin/docker && \
+-    curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.10.5/bin/linux/amd64/kubectl > /usr/bin/kubectl && \
++    curl -sLf https://storage.googleapis.com/kubernetes-release/release/v1.10.5/bin/linux/arm64/kubectl > /usr/bin/kubectl && \
+     chmod +x /usr/bin/kubectl && \
+     DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && \
+     DEBIAN_FRONTEND=noninteractive apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ ENV LOGLEVEL_VERSION v0.1
+-RUN curl -sLf https://github.com/rancher/loglevel/releases/download/${LOGLEVEL_VERSION}/loglevel-amd64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
+-RUN curl -sL https://github.com/rancher/share-mnt/releases/download/v1.0.3/share-mnt.tar.gz | tar xvzf - -C /usr/bin
+-RUN curl -sL https://github.com/c-bata/kube-prompt/releases/download/v1.0.3/kube-prompt_v1.0.3_linux_amd64.zip > /usr/bin/kube-prompt.zip && unzip /usr/bin/kube-prompt.zip -d /usr/bin
++RUN curl -sLf https://github.com/rancherpi/arm64-packages/releases/download/v2.0.8-arm64/loglevel-arm64-${LOGLEVEL_VERSION}.tar.gz | tar xvzf - -C /usr/bin
++RUN curl -sL https://github.com/rancherpi/arm64-packages/releases/download/v2.0.8-arm64/share-mnt.tar.gz | tar xvzf - -C /usr/bin
+ ARG VERSION=dev
++ARG REPO=rancher
+ LABEL io.cattle.agent true
+ ENV DOCKER_API_VERSION 1.24
+-ENV AGENT_IMAGE rancher/rancher-agent:${VERSION}
++ENV AGENT_IMAGE ${REPO}/rancher-agent:${VERSION}
+ ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+ COPY agent run.sh kubectl-shell.sh shell-setup.sh share-root.sh /usr/bin/
+ ENTRYPOINT ["run.sh"]
++ENV ETCD_UNSUPPORTED_ARCH arm64
+diff --git a/pkg/image/export/main.go b/pkg/image/export/main.go
+index 99a9f775..852f20e3 100644
+--- a/pkg/image/export/main.go
++++ b/pkg/image/export/main.go
+@@ -129,8 +129,8 @@ func imagesText(targetImages []string) error {
+ }
+ 
+ func mirrorScript(targetImages []string) error {
+-	log.Println("Creating rancher-mirror-to-rancher-org.sh")
+-	mirror, err := os.Create("rancher-mirror-to-rancher-org.sh")
++	log.Println("Creating rancher-mirror-to-rancherpi-org.sh")
++	mirror, err := os.Create("rancher-mirror-to-rancherpi-org.sh")
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -146,6 +146,10 @@ func mirrorScript(targetImages []string) error {
+ 			continue
+ 		}
+ 
++		if !strings.Contains(srcImage, "-arm64") {
++			continue
++		}
++
+ 		saveImages = append(saveImages, targetImage)
+ 		fmt.Fprintf(mirror, "docker pull %s\n", srcImage)
+ 		if targetImage != srcImage {
+diff --git a/scripts/build-agent b/scripts/build-agent
+index 649e3a66..0c86f8b4 100755
+--- a/scripts/build-agent
++++ b/scripts/build-agent
+@@ -6,5 +6,5 @@ source $(dirname $0)/version
+ cd $(dirname $0)/..
+ 
+ mkdir -p bin
+-[ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
++[ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
+ CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/agent ./pkg/agent
+diff --git a/scripts/build-server b/scripts/build-server
+index 6d6c8184..0fcc6788 100755
+--- a/scripts/build-server
++++ b/scripts/build-server
+@@ -6,5 +6,5 @@ source $(dirname $0)/version
+ cd $(dirname $0)/..
+ 
+ mkdir -p bin
+-[ "$(uname)" != "Darwin" ] && LINKFLAGS="-linkmode external -extldflags -static -s"
++[ "$(uname)" != "Darwin" ] && LINKFLAGS="-extldflags -static -s"
+ CGO_ENABLED=0 go build -i -tags k8s -ldflags "-X main.VERSION=$VERSION $LINKFLAGS" -o bin/rancher
+diff --git a/scripts/package b/scripts/package
+index ca4bf064..94ac696e 100755
+--- a/scripts/package
++++ b/scripts/package
+@@ -3,9 +3,9 @@ set -e
+ 
+ source $(dirname $0)/version
+ 
+-ARCH=${ARCH:-"amd64"}
++ARCH=${ARCH:-"arm64"}
+ SUFFIX=""
+-[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
++[ "${ARCH}" != "arm64" ] && SUFFIX="_${ARCH}"
+ 
+ cd $(dirname $0)/../package
+ 
+@@ -24,8 +24,8 @@ cp ../bin/rancher ../bin/agent .
+ 
+ IMAGE=${REPO}/rancher:${TAG}
+ AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
+-docker build --build-arg VERSION=${TAG} -t ${IMAGE} .
+-docker build --build-arg VERSION=${TAG} -t ${AGENT_IMAGE} -f Dockerfile.agent .
++docker build --build-arg VERSION=${TAG} --build-arg REPO=${REPO} -t ${IMAGE} .
++docker build --build-arg VERSION=${TAG} --build-arg REPO=${REPO} -t ${AGENT_IMAGE} -f Dockerfile.agent .
+ echo ${IMAGE} > ../dist/images
+ echo ${AGENT_IMAGE} >> ../dist/images
+ echo Built ${IMAGE} #${AGENT_IMAGE}
+diff --git a/scripts/version b/scripts/version
+index 87d180fc..33277701 100755
+--- a/scripts/version
++++ b/scripts/version
+@@ -14,5 +14,5 @@ else
+ fi
+ 
+ if [ -z "$ARCH" ]; then
+-    ARCH=amd64
++    ARCH=arm64
+ fi
+diff --git a/vendor/github.com/rancher/rke/docker/docker.go b/vendor/github.com/rancher/rke/docker/docker.go
+index b88b6542..37e3d1c8 100644
+--- a/vendor/github.com/rancher/rke/docker/docker.go
++++ b/vendor/github.com/rancher/rke/docker/docker.go
+@@ -218,7 +218,7 @@ func UseLocalOrPull(ctx context.Context, dClient *client.Client, hostname string
+ }
+ 
+ func RemoveContainer(ctx context.Context, dClient *client.Client, hostname string, containerName string) error {
+-	err := dClient.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{})
++	err := dClient.ContainerRemove(ctx, containerName, types.ContainerRemoveOptions{Force: true})
+ 	if err != nil {
+ 		return fmt.Errorf("Can't remove Docker container [%s] for host [%s]: %v", containerName, hostname, err)
+ 	}
+diff --git a/vendor/github.com/rancher/types/apis/management.cattle.io/v3/k8s_defaults.go b/vendor/github.com/rancher/types/apis/management.cattle.io/v3/k8s_defaults.go
+index 60af85d2..aeb210c4 100644
+--- a/vendor/github.com/rancher/types/apis/management.cattle.io/v3/k8s_defaults.go
++++ b/vendor/github.com/rancher/types/apis/management.cattle.io/v3/k8s_defaults.go
+@@ -8,7 +8,7 @@ import (
+ )
+ 
+ const (
+-	DefaultK8s = "v1.11.2-rancher1-1"
++	DefaultK8s = "v1.11.2-rancher1-1-arm64"
+ )
+ 
+ var (
+@@ -19,6 +19,7 @@ var (
+ 		"v1.9.7-rancher2-2",
+ 		"v1.10.5-rancher1-2",
+ 		"v1.11.2-rancher1-1",
++		"v1.11.2-rancher1-1-arm64",
+ 	}
+ 
+ 	// K8sVersionToRKESystemImages is dynamically populated on init() with the latest versions
+@@ -456,6 +457,32 @@ var (
+ 			IngressBackend:            m("k8s.gcr.io/defaultbackend:1.4"),
+ 			MetricsServer:             m("gcr.io/google_containers/metrics-server-amd64:v0.2.1"),
+ 		},
++		"v1.11.2-rancher1-1-arm64": {
++			Etcd:                      m("k8s.gcr.io/etcd-arm64:3.2.18"),
++			Kubernetes:                m("rancherpi/hyperkube-arm64:v1.11.2-rancher1"),
++			Alpine:                    m("rancherpi/rke-tools-arm64:v0.1.13"),
++			NginxProxy:                m("rancherpi/rke-tools-arm64:v0.1.13"),
++			CertDownloader:            m("rancherpi/rke-tools-arm64:v0.1.13"),
++			KubernetesServicesSidecar: m("rancherpi/rke-tools-arm64:v0.1.13"),
++			KubeDNS:                   m("gcr.io/google_containers/k8s-dns-kube-dns-arm64:1.14.10"),
++			DNSmasq:                   m("gcr.io/google_containers/k8s-dns-dnsmasq-nanny-arm64:1.14.10"),
++			KubeDNSSidecar:            m("gcr.io/google_containers/k8s-dns-sidecar-arm64:1.14.10"),
++			KubeDNSAutoscaler:         m("gcr.io/google_containers/cluster-proportional-autoscaler-arm64:1.0.0"),
++			Flannel:                   m("quay.io/coreos/flannel:v0.9.1-arm64"),
++			FlannelCNI:                m("rancherpi/flannel-cni:v0.3.0-arm64"),
++			CalicoNode:                m("quay.io/calico/node:v3.2.3-arm64"),
++			CalicoCNI:                 m("quay.io/calico/cni:v3.2.3-arm64"),
++			CalicoCtl:                 m("quay.io/calico/ctl:v3.2.0-arm64"),
++			CanalNode:                 m("quay.io/calico/node:v3.2.3-arm64"),
++			CanalCNI:                  m("quay.io/calico/cni:v3.2.3-arm64"),
++			CanalFlannel:              m("quay.io/coreos/flannel:v0.9.1-arm64"),
++			WeaveNode:                 m("weaveworks/weave-kube:2.1.2"),
++			WeaveCNI:                  m("weaveworks/weave-npc:2.1.2"),
++			PodInfraContainer:         m("gcr.io/google_containers/pause-arm64:3.1"),
++			Ingress:                   m("rancherpi/nginx-ingress-controller:0.16.2-rancher1-arm64"),
++			IngressBackend:            m("k8s.gcr.io/defaultbackend-arm64:1.4"),
++			MetricsServer:             m("gcr.io/google_containers/metrics-server-arm64:v0.2.1"),
++		},
+ 	}
+ )
+ 
+@@ -479,7 +506,8 @@ func init() {
+ 		}
+ 
+ 		longName := "rancher/hyperkube:" + version
+-		if !strings.HasPrefix(longName, images.Kubernetes) {
++		longNameArm := "rancherpi/hyperkube-arm64:" + version
++		if !strings.HasPrefix(longName, images.Kubernetes) && !strings.HasPrefix(longNameArm, images.Kubernetes) {
+ 			panic(fmt.Sprintf("For K8s version %s, the Kubernetes image tag should be a substring of %s, currently it is %s", version, version, images.Kubernetes))
+ 		}
+ 	}
+diff --git a/vendor/github.com/rancher/types/image/mirror.go b/vendor/github.com/rancher/types/image/mirror.go
+index 77f60cec..87a2cd0d 100644
+--- a/vendor/github.com/rancher/types/image/mirror.go
++++ b/vendor/github.com/rancher/types/image/mirror.go
+@@ -10,6 +10,27 @@ func Mirror(image string) string {
+ 		return image
+ 	}
+ 
++	if strings.HasPrefix(image, "rancherpi/") {
++		return image
++	}
++
++	if strings.Contains(image, "-arm64") {
++		image = strings.Replace(image, "antmanler/", "rancherpi/", 1)
++		image = strings.Replace(image, "gcr.io/google_containers", "rancherpi", 1)
++		image = strings.Replace(image, "quay.io/coreos/", "rancherpi/coreos-", 1)
++		image = strings.Replace(image, "quay.io/calico/", "rancherpi/calico-", 1)
++		image = strings.Replace(image, "k8s.gcr.io/", "rancherpi/", 1)
++		// image = strings.Replace(image, "plugins/docker", "rancher/jenkins-plugins-docker", 1)
++		// image = strings.Replace(image, "kibana", "rancher/kibana", 1)
++		// image = strings.Replace(image, "jenkins/", "rancher/jenkins-", 1)
++		// image = strings.Replace(image, "alpine/git", "rancher/alpine-git", 1)
++		// image = strings.Replace(image, "prom/", "rancher/prom-", 1)
++		// image = strings.Replace(image, "quay.io/pires", "rancherpi", 1)
++
++		Mirrors[image] = orig
++		return image
++	}
++
+ 	image = strings.Replace(image, "gcr.io/google_containers", "rancher", 1)
+ 	image = strings.Replace(image, "quay.io/coreos/", "rancher/coreos-", 1)
+ 	image = strings.Replace(image, "quay.io/calico/", "rancher/calico-", 1)

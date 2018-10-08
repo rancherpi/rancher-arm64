@@ -1,0 +1,116 @@
+diff --git a/Dockerfile.dapper b/Dockerfile.dapper
+index 310fc08c0..c4fb36754 100644
+--- a/Dockerfile.dapper
++++ b/Dockerfile.dapper
+@@ -8,17 +8,18 @@ RUN apt-get update && \
+     apt-get install -y gcc ca-certificates git wget curl vim less file zip && \
+     rm -f /bin/sh && ln -s /bin/bash /bin/sh
+ 
+-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
++ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
+ 
+-RUN wget -O - https://storage.googleapis.com/golang/go1.9.3.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+-    go get github.com/rancher/trash && go get golang.org/x/lint/golint && go get -u github.com/jteeuwen/go-bindata/...
++RUN wget -O - https://storage.googleapis.com/golang/go1.9.2.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
++    go get github.com/rancher/trash && go get github.com/golang/lint/golint
+ 
+-ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
+-    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
++ENV DOCKER_URL_amd64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.1-ce.tgz \
++    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.11.2-ros1/docker-1.11.2_arm.tgz \
++    DOCKER_URL_arm64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.0-ce.tgz \
+     DOCKER_URL=DOCKER_URL_${ARCH}
+ 
+-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
++RUN curl -sLf ${!DOCKER_URL} | tar xvzf - -C /usr/bin --strip-components=1 docker/docker && chmod +x /usr/bin/docker
+ 
+ ENV DAPPER_SOURCE /go/src/k8s.io/ingress-nginx/
+ ENV DAPPER_OUTPUT ./bin ./dist
+diff --git a/Makefile b/Makefile
+index d7d72a16d..83be02055 100644
+--- a/Makefile
++++ b/Makefile
+@@ -8,7 +8,7 @@ TARGETS := $(shell ls scripts)
+ 	@mv .dapper.tmp .dapper
+ 
+ $(TARGETS): .dapper
+-	./.dapper $@
++	./.dapper -m bind $@
+ 
+ trash: .dapper
+ 	./.dapper -m bind trash
+diff --git a/scripts/build b/scripts/build
+index 4d589f312..e4a7690f5 100755
+--- a/scripts/build
++++ b/scripts/build
+@@ -8,7 +8,7 @@ cd $(dirname $0)/..
+ declare -A OS_ARCH_ARG
+ 
+ OS_PLATFORM_ARG=(linux)
+-OS_ARCH_ARG[linux]="amd64"
++OS_ARCH_ARG[linux]="arm64"
+ PKG="k8s.io/ingress-nginx"
+ 
+ if [ -n "$CROSS" ]; then
+diff --git a/scripts/package b/scripts/package
+index 1c0ca716c..22bef8f07 100755
+--- a/scripts/package
++++ b/scripts/package
+@@ -1,7 +1,7 @@
+ #!/bin/bash
+ set -e
+ 
+-REPO=${REPO:-rancher}
++REPO=${REPO:-rancherpi}
+ SCRIPTPATH="$(cd "$(dirname "$0")"; pwd -P)"
+ QEMUVERSION=v2.9.1-1
+ IMAGE=$REPO/nginx-ingress-controller
+@@ -20,10 +20,10 @@ package (){
+         GOARCH=arm
+         DUMB_ARCH=armhf
+     fi
+-    if [ "$2"= "arm64" ]; then
++    if [ "$2" = "arm64" ]; then
+         QEMUARCH=aarch64
+     fi
+-    if [ "$2" = "ppc64le"]; then
++    if [ "$2" = "ppc64le" ]; then
+         QEMUARCH=ppc64le
+         GOARCH=ppc64le
+         DUMB_ARCH=ppc64el
+@@ -38,9 +38,9 @@ package (){
+     cp -r ../rootfs/* ./tmp/
+     sed -i "s|BASEIMAGE|$BASEIMAGE|g" $dockerfilename
+ 
+-    if [ "$2" == "amd64" ]; then
++    if [ "$2" == "arm64" ]; then
+         sed -i "/CROSS_BUILD_/d" $dockerfilename
+-    else 
++    else
+         docker run --rm --privileged multiarch/qemu-user-static:register --reset
+         curl -sSL "https://github.com/multiarch/qemu-user-static/releases/download/${QEMUVERSION}/x86_64_qemu-${QEMUARCH}-static.tar.gz" | tar -xz -C tmp
+         sed -i "s/CROSS_BUILD_//g" $dockerfilename
+@@ -49,7 +49,7 @@ package (){
+     echo "building image $IMAGE_NAME:$TAG"
+     docker build -t $IMAGE_NAME:$TAG tmp
+ 
+-    if [ "$2" == "amd64" ]; then
++    if [ "$2" == "arm64" ]; then
+         docker tag $IMAGE_NAME:$TAG $IMAGE:$TAG
+     fi
+     rm -rf tmp
+diff --git a/scripts/version b/scripts/version
+index 7c10ccac8..fb0c16242 100755
+--- a/scripts/version
++++ b/scripts/version
+@@ -15,7 +15,7 @@ else
+ fi
+ 
+ if [ -z "$ARCH" ]; then
+-    ARCH=amd64
++    ARCH=arm64
+ fi
+ 
+ TAG=${TAG:-$VERSION}
+\ No newline at end of file

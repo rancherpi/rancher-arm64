@@ -1,0 +1,44 @@
+diff --git a/Dockerfile.dapper b/Dockerfile.dapper
+index d6f0c26..8f1250b 100644
+--- a/Dockerfile.dapper
++++ b/Dockerfile.dapper
+@@ -8,17 +8,18 @@ RUN apt-get update && \
+     apt-get install -y gcc ca-certificates git wget curl vim less file && \
+     rm -f /bin/sh && ln -s /bin/bash /bin/sh
+ 
+-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
++ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
+ 
+-RUN wget -O - https://storage.googleapis.com/golang/go1.8.3.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
++RUN wget -O - https://storage.googleapis.com/golang/go1.9.2.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+     go get github.com/rancher/trash && go get github.com/golang/lint/golint
+ 
+-ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
+-    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
++ENV DOCKER_URL_amd64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.1-ce.tgz \
++    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.11.2-ros1/docker-1.11.2_arm.tgz \
++    DOCKER_URL_arm64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.0-ce.tgz \
+     DOCKER_URL=DOCKER_URL_${ARCH}
+ 
+-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
++RUN curl -sLf ${!DOCKER_URL} | tar xvzf - -C /usr/bin --strip-components=1 docker/docker
+ 
+ ENV DAPPER_SOURCE /go/src/github.com/rancher/share-mnt/
+ ENV DAPPER_OUTPUT ./bin ./dist
+diff --git a/scripts/package b/scripts/package
+index 70130da..e208770 100755
+--- a/scripts/package
++++ b/scripts/package
+@@ -3,9 +3,9 @@ set -e
+ 
+ source $(dirname $0)/version
+ 
+-ARCH=${ARCH:-"amd64"}
++ARCH=${ARCH:-"arm64"}
+ SUFFIX=""
+-[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
++[ "${ARCH}" != "arm64" ] && SUFFIX="_${ARCH}"
+ 
+ cd $(dirname $0)/../dist
+ 

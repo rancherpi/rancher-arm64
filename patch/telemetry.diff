@@ -1,0 +1,38 @@
+diff --git a/Dockerfile.dapper b/Dockerfile.dapper
+index 199d203..cdfb52e 100644
+--- a/Dockerfile.dapper
++++ b/Dockerfile.dapper
+@@ -8,17 +8,18 @@ RUN apt-get update && \
+     apt-get install -y gcc ca-certificates git wget curl vim less file && \
+     rm -f /bin/sh && ln -s /bin/bash /bin/sh
+ 
+-ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
++ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
+     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
+ 
+ RUN wget -O - https://storage.googleapis.com/golang/go1.9.2.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+     go get github.com/rancher/trash && go get github.com/golang/lint/golint
+ 
+-ENV DOCKER_URL_amd64=https://get.docker.com/builds/Linux/x86_64/docker-1.10.3 \
+-    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.10.3-ros1/docker-1.10.3_arm \
++ENV DOCKER_URL_amd64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.1-ce.tgz \
++    DOCKER_URL_arm=https://github.com/rancher/docker/releases/download/v1.11.2-ros1/docker-1.11.2_arm.tgz \
++    DOCKER_URL_arm64=https://download.docker.com/linux/static/stable/aarch64/docker-17.09.0-ce.tgz \
+     DOCKER_URL=DOCKER_URL_${ARCH}
+ 
+-RUN wget -O - ${!DOCKER_URL} > /usr/bin/docker && chmod +x /usr/bin/docker
++RUN curl -sLf ${!DOCKER_URL} | tar xvzf - -C /usr/bin --strip-components=1 docker/docker && chmod +x /usr/bin/docker
+ 
+ ENV DAPPER_ENV REPO TAG DRONE_TAG
+ ENV DAPPER_SOURCE /go/src/github.com/rancher/telemetry/
+diff --git a/scripts/version b/scripts/version
+index 87d180f..3327770 100755
+--- a/scripts/version
++++ b/scripts/version
+@@ -14,5 +14,5 @@ else
+ fi
+ 
+ if [ -z "$ARCH" ]; then
+-    ARCH=amd64
++    ARCH=arm64
+ fi

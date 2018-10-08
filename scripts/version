@@ -1,0 +1,49 @@
+
+REPO=rancherpi
+ARCH=arm64
+RR_SUFFIX="-${ARCH}"
+CO_BRANCH=v2.0.8${RR_SUFFIX}
+
+BUILD_RELEASE=""
+RANCHER_TAG=v2.0.8
+
+CATTLE_HELM_VERSION=v2.9.1-rancher1
+CATTLE_MACHINE_VERSION=v0.15.0-rancher1-1
+TELEMETRY_VERSION=v0.5.1
+SHARE_MNT_VERSION=v1.0.3
+RKE_TOOLS_VERSION=v0.1.13
+LOGLEVEL_VERSION=v0.1
+FLANNEL_CNI_VERSION=v0.3.0
+INGRESS_NGINX_VERSION="0.16.2-rancher1"
+RANCHER_HYPERKUBE_VERSION="v1.11.2-rancher1"
+
+git_ensure() {
+    name=$(basename $1 | cut -f 1 -d '.')
+    if [ ! -d $name ]; then
+        git clone $1
+    else
+        (
+            cd $name
+            git fetch
+        )
+    fi
+}
+
+co(){
+    (
+        cd "$1"
+        git checkout "$2"
+        brach_name="$2${RR_SUFFIX}"
+        if [ -n "$3" ]; then
+            brach_name="$3"
+        fi
+        git checkout -b "${brach_name}" 2>/dev/null || git checkout "${brach_name}"
+    )
+}
+
+reset() {
+    (
+        cd $1
+        git reset --hard $2
+    )
+}
